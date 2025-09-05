@@ -10,59 +10,134 @@ const phoneOk = (p: string) => /^1[3-9]\d{9}$/.test(p)
 function useSignaturePad() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [dataUrl, setDataUrl] = useState('')
+  const [isDrawing, setIsDrawing] = useState(false)
+  
+  const setupCanvas = () => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    
+    const DPR = window.devicePixelRatio || 1
+    const rect = canvas.getBoundingClientRect()
+    
+    // 设置canvas的实际像素尺寸
+    canvas.width = rect.width * DPR
+    canvas.height = rect.height * DPR
+    
+    // 设置canvas的显示尺寸
+    canvas.style.width = rect.width + 'px'
+    canvas.style.height = rect.height + 'px'
+    
+    // 缩放绘图上下文以匹配设备像素比
+    ctx.scale(DPR, DPR)
+    
+    // 设置绘图样式
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(0, 0, rect.width, rect.height)
+    ctx.strokeStyle = '#000'
+    ctx.lineWidth = 2
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+  }
+  
+  const getEventPos = (e: MouseEvent | TouchEvent) => {
+    const canvas = canvasRef.current
+    if (!canvas) return { x: 0, y: 0 }
+    
+    const rect = canvas.getBoundingClientRect()
+    const touch = (e as TouchEvent).touches?.[0]
+    const clientX = touch ? touch.clientX : (e as MouseEvent).clientX
+    const clientY = touch ? touch.clientY : (e as MouseEvent).clientY
+    
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top
+    }
+  }
+  
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDrawing(true)
+    const pos = getEventPos(e.nativeEvent)
+    const canvas = canvasRef.current
+    if (!canvas) return
+    
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    
+    ctx.beginPath()
+    ctx.moveTo(pos.x, pos.y)
+  }
+  
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return
+    e.preventDefault()
+    e.stopPropagation()
+    
+    const pos = getEventPos(e.nativeEvent)
+    const canvas = canvasRef.current
+    if (!canvas) return
+    
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    
+    ctx.lineTo(pos.x, pos.y)
+    ctx.stroke()
+  }
+  
+  const stopDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDrawing(false)
+  }
+  
+  const clearCanvas = () => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    
+    const rect = canvas.getBoundingClientRect()
+    ctx.fillStyle = '#fff'
+    ctx.fillRect(0, 0, rect.width, rect.height)
+    setDataUrl('')
+  }
+  
+  const saveSignature = () => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    
+    const dataURL = canvas.toDataURL('image/png')
+    setDataUrl(dataURL)
+  }
+  
+  // 当canvas引用变化时重新设置
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const ctx = canvas.getContext('2d')!
-    const DPR = window.devicePixelRatio || 1
-    function setup() {
-      const c = canvasRef.current
-      if (!c) return
-      const rect = c.getBoundingClientRect()
-      c.width = Math.max(1, rect.width * DPR)
-      c.height = Math.max(1, 240 * DPR)
-      ctx.setTransform(DPR, 0, 0, DPR, 0, 0)
-      ctx.fillStyle = '#fff'
-      ctx.fillRect(0,0,Math.max(1, rect.width),240)
-      ctx.strokeStyle = '#000'
-      ctx.lineWidth = 2
-      ctx.lineCap = 'round'
-      ctx.lineJoin = 'round'
-    }
-    setup()
-    let drawing = false
-    let last: {x:number,y:number} | null = null
-    const pos = (e: MouseEvent | TouchEvent) => {
-      const rect = canvas.getBoundingClientRect()
-      const t = (e as TouchEvent).touches?.[0]
-      const x = (t? t.clientX : (e as MouseEvent).clientX) - rect.left
-      const y = (t? t.clientY : (e as MouseEvent).clientY) - rect.top
-      return { x, y }
-    }
-    const start = (e: any) => { drawing = true; last = pos(e) }
-    const move = (e: any) => {
-      if (!drawing || !last) return
-      const p = pos(e)
-      ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke(); last = p
-      e.preventDefault()
-    }
-    const end = () => { drawing = false; last = null }
-    canvas.addEventListener('mousedown', start)
-    canvas.addEventListener('mousemove', move)
-    window.addEventListener('mouseup', end)
-    canvas.addEventListener('touchstart', start, { passive: false })
-    canvas.addEventListener('touchmove', move, { passive: false })
-    canvas.addEventListener('touchend', end)
-    return () => {
-      canvas.removeEventListener('mousedown', start)
-      canvas.removeEventListener('mousemove', move)
-      window.removeEventListener('mouseup', end)
-      canvas.removeEventListener('touchstart', start)
-      canvas.removeEventListener('touchmove', move)
-      canvas.removeEventListener('touchend', end)
-    }
-  }, [])
-  return { canvasRef, dataUrl, setDataUrl }
+    
+    // 延迟设置以确保DOM已渲染
+    const timer = setTimeout(() => {
+      setupCanvas()
+    }, 100)
+    
+    return () => clearTimeout(timer)
+  }, [canvasRef.current])
+  
+  return { 
+    canvasRef, 
+    dataUrl, 
+    setDataUrl, 
+    clearCanvas, 
+    saveSignature,
+    startDrawing,
+    draw,
+    stopDrawing
+  }
 }
 
 export default function Page() {
@@ -74,7 +149,7 @@ export default function Page() {
   const [open, setOpen] = useState(false)
   const [consented, setConsented] = useState(false)
   const [consentOpen, setConsentOpen] = useState(false)
-  const { canvasRef, dataUrl, setDataUrl } = useSignaturePad()
+  const { canvasRef, dataUrl, setDataUrl, clearCanvas, saveSignature, startDrawing, draw, stopDrawing } = useSignaturePad()
 
   const phoneLocked = typeof window !== 'undefined' && !!sessionStorage.getItem('votedPhone')
 
@@ -87,6 +162,22 @@ export default function Page() {
     setConsented(!!c)
     if (!c) setConsentOpen(true)
   }, [])
+
+  // 当签名模态框打开时阻止页面滚动
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden'
+      document.body.style.touchAction = 'none'
+    } else {
+      document.body.style.overflow = ''
+      document.body.style.touchAction = ''
+    }
+    
+    return () => {
+      document.body.style.overflow = ''
+      document.body.style.touchAction = ''
+    }
+  }, [open])
 
   const submit = async () => {
     if (phoneLocked) return alert('此设备已完成投票')
@@ -133,7 +224,11 @@ export default function Page() {
       </div>
 
       {open && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center">
+        <div 
+          className="fixed inset-0 bg-black/50 flex items-center justify-center"
+          style={{ touchAction: 'none' }}
+          onTouchMove={(e) => e.preventDefault()}
+        >
           <div className="bg-white w-[92%] max-w-xl rounded-lg overflow-hidden">
             <div className="flex items-center justify-between p-3 border-b">
               <div>请在下方签名</div>
@@ -141,12 +236,23 @@ export default function Page() {
             </div>
             <div className="p-3">
               <div className="h-60">
-                <canvas ref={canvasRef} className="w-full h-full border rounded" />
+                <canvas 
+                  ref={canvasRef} 
+                  className="w-full h-full border rounded cursor-crosshair touch-none select-none"
+                  style={{ touchAction: 'none' }}
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseLeave={stopDrawing}
+                  onTouchStart={startDrawing}
+                  onTouchMove={draw}
+                  onTouchEnd={stopDrawing}
+                />
               </div>
             </div>
             <div className="flex gap-2 justify-end p-3 border-t">
-              <button className="px-3 py-2 border rounded" onClick={()=>setDataUrl('')}>清除</button>
-              <button className="px-3 py-2 bg-blue-600 text-white rounded" onClick={()=>{ const c = canvasRef.current; if (c) setDataUrl(c.toDataURL('image/png')); setOpen(false); }}>保存签名</button>
+              <button className="px-3 py-2 border rounded" onClick={clearCanvas}>清除</button>
+              <button className="px-3 py-2 bg-blue-600 text-white rounded" onClick={()=>{ saveSignature(); setOpen(false); }}>保存签名</button>
             </div>
           </div>
         </div>
