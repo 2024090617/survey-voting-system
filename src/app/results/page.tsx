@@ -1,3 +1,7 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+
 export const dynamic = 'force-dynamic'
 
 async function getResults() {
@@ -5,8 +9,22 @@ async function getResults() {
   return res.json()
 }
 
-export default async function ResultsPage() {
-  const { petition, totalSignatures, surveyResults } = await getResults()
+export default function ResultsPage() {
+  const [data, setData] = useState<{
+    petition: any
+    totalSignatures: number
+    surveyResults: any[]
+  } | null>(null)
+
+  useEffect(() => {
+    getResults().then(setData)
+  }, [])
+
+  if (!data) {
+    return <div className="max-w-4xl mx-auto p-4">加载中...</div>
+  }
+
+  const { petition, totalSignatures, surveyResults } = data
   
   return (
     <main className="max-w-4xl mx-auto p-4 space-y-8">
@@ -108,15 +126,6 @@ export default async function ResultsPage() {
           打印结果
         </button>
       </div>
-
-      {/* 打印样式 */}
-      <style jsx>{`
-        @media print {
-          .print\\:hidden {
-            display: none !important;
-          }
-        }
-      `}</style>
     </main>
   )
 }
