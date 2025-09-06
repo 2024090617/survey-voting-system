@@ -5,25 +5,71 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 export async function GET() {
-  const poll = await prisma.poll.findFirst()
-  if (!poll) return NextResponse.json({ poll: null, options: [] })
-  const options = await prisma.pollOption.findMany({ where: { pollId: poll.id } })
-  return NextResponse.json({ poll, options })
+  const petition = await prisma.petition.findFirst({
+    include: {
+      surveys: {
+        include: {
+          options: {
+            orderBy: { order: 'asc' }
+          }
+        },
+        orderBy: { order: 'asc' }
+      }
+    }
+  })
+  if (!petition) return NextResponse.json({ petition: null, surveys: [] })
+  return NextResponse.json({ petition, surveys: petition.surveys })
 }
 
 export async function POST(req: Request) {
   const body = await req.json()
-  const { title, options } = body as { title?: string; options?: { label: string; imageUrl?: string | null }[] }
-  if (!title || !options || options.length < 2) {
-    return NextResponse.json({ error: 'title and >=2 options required' }, { status: 400 })
+  const { title, content, surveys } = body as { 
+    title?: string; 
+    content?: string;
+    surveys?: { title: string; questionType: 'single' | 'multiple'; options: { label: string; }[] }[]
   }
-  // Reset single poll
-  await prisma.vote.deleteMany()
-  await prisma.pollOption.deleteMany()
-  await prisma.poll.deleteMany()
-  const poll = await prisma.poll.create({ data: { title } })
-  for (const o of options) {
-    await prisma.pollOption.create({ data: { label: o.label, imageUrl: o.imageUrl, pollId: poll.id } })
+  
+  if (!title || !content) {
+    return NextResponse.json({ error: 'title and content required' }, { status: 400 })
   }
-  return NextResponse.json({ ok: true, id: poll.id })
+
+  // Reset existing data
+  await prisma.surveyResponse.deleteMany()
+  await prisma.signature.deleteMany()
+  await prisma.surveyOption.deleteMany()
+  await prisma.survey.deleteMany()
+  await prisma.petition.deleteMany()
+
+  // Create new petition
+  const petition = await prisma.petition.create({ 
+    data: { title, content } 
+  })
+
+  // Create surveys if provided
+  if (surveys && surveys.length > 0) {
+    for (let i = 0; i < surveys.length; i++) {
+      const survey = surveys[i]
+      const createdSurvey = await prisma.survey.create({
+        data: {
+          title: survey.title,
+          questionType: survey.questionType,
+          order: i,
+          petitionId: petition.id
+        }
+      })
+
+      // Create survey options
+      for (let j = 0; j < survey.options.length; j++) {
+        await prisma.surveyOption.create({
+          data: {
+            label: survey.options[j].label,
+            order: j,
+            surveyId: createdSurvey.id
+          }
+        })
+      }
+    }
+  }
+
+  return NextResponse.json({ ok: true, id: petition.id })
 }
