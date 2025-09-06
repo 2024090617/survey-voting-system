@@ -1,5 +1,5 @@
 {
-    "name": "survey-voting-system",
+    "name": "petition-system",
     "version": "1.0.0",
     "private": true,
     "scripts": {
@@ -9,10 +9,13 @@
     },
     "dependencies": {
         "@prisma/client": "^6.15.0",
+        "@tailwindcss/typography": "^0.5.16",
         "next": "^14.2.32",
         "prisma": "^6.15.0",
+        "quill": "^2.0.3",
         "react": "^18.3.1",
         "react-dom": "^18.3.1",
+        "react-quill": "^2.0.0",
         "sharp": "^0.34.3",
         "zod": "^4.1.5"
     },

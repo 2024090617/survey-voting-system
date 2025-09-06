@@ -7,32 +7,62 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Poll {
-  id      String       @id @default(cuid())
-  title   String
-  options PollOption[]
-  votes   Vote[]
+// 请愿书主表
+model Petition {
+  id          String      @id @default(cuid())
+  title       String
+  content     String      @db.Text // 富文本内容
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  surveys     Survey[]    // 关联的调查问卷
+  signatures  Signature[] // 支持签名
 }
 
-model PollOption {
-  id       String  @id @default(cuid())
-  label    String
-  imageUrl String?
-  poll     Poll    @relation(fields: [pollId], references: [id])
-  pollId   String
-  votes    Vote[]
+// 调查问卷
+model Survey {
+  id           String         @id @default(cuid())
+  title        String         @db.Text // 富文本标题
+  questionType String         // 'single' 或 'multiple'
+  order        Int            // 显示顺序
+  petition     Petition       @relation(fields: [petitionId], references: [id], onDelete: Cascade)
+  petitionId   String
+  options      SurveyOption[] // 选项
+  responses    SurveyResponse[] // 回答
 }
 
-model Vote {
-  id            String   @id @default(cuid())
+// 调查问卷选项
+model SurveyOption {
+  id        String           @id @default(cuid())
+  label     String
+  order     Int              // 选项顺序
+  survey    Survey           @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  surveyId  String
+  responses SurveyResponse[] // 被选择的回答
+}
+
+// 支持签名记录
+model Signature {
+  id            String           @id @default(cuid())
   name          String
-  phone         String   @db.VarChar(20)
+  phone         String           @db.VarChar(20)
   signaturePath String
-  createdAt     DateTime @default(now())
-  poll          Poll     @relation(fields: [pollId], references: [id])
-  pollId        String
-  option        PollOption @relation(fields: [optionId], references: [id])
-  optionId      String
+  createdAt     DateTime         @default(now())
+  petition      Petition         @relation(fields: [petitionId], references: [id], onDelete: Cascade)
+  petitionId    String
+  responses     SurveyResponse[] // 调查问卷回答
 
-  @@unique([pollId, phone])
+  @@unique([petitionId, phone]) // 同一手机号只能支持一次同一请愿书
+}
+
+// 调查问卷回答
+model SurveyResponse {
+  id          String        @id @default(cuid())
+  signature   Signature     @relation(fields: [signatureId], references: [id], onDelete: Cascade)
+  signatureId String
+  survey      Survey        @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+  surveyId    String
+  option      SurveyOption  @relation(fields: [optionId], references: [id], onDelete: Cascade)
+  optionId    String
+
+  @@unique([signatureId, surveyId, optionId]) // 防止重复选择
 }
