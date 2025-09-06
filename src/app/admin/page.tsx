@@ -124,6 +124,7 @@ export default function AdminPage() {
       return alert(json.error || '创建失败')
     }
     alert('创建成功')
+    router.push('/dashboard')
   }
 
   // 如果正在加载或未登录，显示加载状态
