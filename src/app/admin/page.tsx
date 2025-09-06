@@ -1,6 +1,8 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
+import { useAuth } from '@/hooks/useAuth'
 
 // 动态导入富文本编辑器，避免SSR问题
 const ReactQuill = dynamic(() => import('react-quill'), { ssr: false })
@@ -14,10 +16,21 @@ type Survey = {
 }
 
 export default function AdminPage() {
+  const { user, loading, isAuthenticated, logout } = useAuth()
+  const router = useRouter()
+  
   const [title, setTitle] = useState('请愿书标题')
   const [content, setContent] = useState('<p>请在此输入请愿书内容...</p>')
   const [surveys, setSurveys] = useState<Survey[]>([])
   const [busy, setBusy] = useState(false)
+  const [activatedAt, setActivatedAt] = useState<string>('')
+
+  // 身份验证检查
+  useEffect(() => {
+    if (!loading && !isAuthenticated) {
+      router.push('/auth')
+    }
+  }, [loading, isAuthenticated, router])
 
   // 添加调查问卷
   const addSurvey = () => {
@@ -82,12 +95,17 @@ export default function AdminPage() {
     }
 
     setBusy(true)
+    const token = localStorage.getItem('authToken')
     const res = await fetch('/api/poll', { 
       method: 'POST', 
-      headers: { 'Content-Type': 'application/json' }, 
+      headers: { 
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }, 
       body: JSON.stringify({ 
         title, 
         content, 
+        activatedAt: activatedAt || null,
         surveys: surveys.map(s => ({
           ...s,
           options: s.options.filter(o => o.label.trim())
@@ -96,13 +114,42 @@ export default function AdminPage() {
     })
     setBusy(false)
     const json = await res.json()
-    if (!res.ok) return alert(json.error || '创建失败')
+    if (!res.ok) {
+      if (res.status === 401) {
+        alert('请重新登录')
+        logout()
+        router.push('/auth')
+        return
+      }
+      return alert(json.error || '创建失败')
+    }
     alert('创建成功')
+  }
+
+  // 如果正在加载或未登录，显示加载状态
+  if (loading) {
+    return <div className="max-w-4xl mx-auto p-4">加载中...</div>
+  }
+
+  if (!isAuthenticated) {
+    return null // 会被重定向到登录页面
   }
 
   return (
     <main className="max-w-4xl mx-auto p-4 space-y-6">
-      <h1 className="text-2xl font-semibold">创建请愿书</h1>
+      {/* 用户信息和登出 */}
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-semibold">创建请愿书</h1>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-gray-600">欢迎，{user?.name}</span>
+          <button 
+            onClick={logout} 
+            className="text-sm text-red-600 hover:text-red-800"
+          >
+            退出登录
+          </button>
+        </div>
+      </div>
       
       {/* 请愿书标题 */}
       <div className="space-y-2">
@@ -136,6 +183,55 @@ export default function AdminPage() {
             }}
             style={{ height: '200px', marginBottom: '42px' }}
           />
+        </div>
+      </div>
+
+      {/* 激活时间设置 */}
+      <div className="space-y-2">
+        <label className="block text-sm font-medium">激活时间设置</label>
+        <div className="space-y-3">
+          <div className="flex items-center gap-4">
+            <input
+              type="radio"
+              id="immediate"
+              name="activation"
+              checked={!activatedAt}
+              onChange={() => setActivatedAt('')}
+              className="w-4 h-4"
+            />
+            <label htmlFor="immediate" className="text-sm">立即激活</label>
+          </div>
+          <div className="flex items-center gap-4">
+            <input
+              type="radio"
+              id="scheduled"
+              name="activation"
+              checked={!!activatedAt}
+              onChange={() => {
+                if (!activatedAt) {
+                  const now = new Date()
+                  now.setHours(now.getHours() + 1) // 默认1小时后
+                  setActivatedAt(now.toISOString().slice(0, 16))
+                }
+              }}
+              className="w-4 h-4"
+            />
+            <label htmlFor="scheduled" className="text-sm">定时激活</label>
+          </div>
+          {activatedAt && (
+            <div className="ml-8">
+              <input
+                type="datetime-local"
+                value={activatedAt}
+                onChange={(e) => setActivatedAt(e.target.value)}
+                min={new Date().toISOString().slice(0, 16)}
+                className="border rounded px-3 py-2"
+              />
+              <div className="text-xs text-gray-500 mt-1">
+                请选择请愿书激活的时间，在此时间之前用户无法看到和签名
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

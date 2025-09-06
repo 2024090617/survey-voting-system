@@ -6,6 +6,12 @@ const prisma = new PrismaClient()
 
 export async function GET() {
   const petition = await prisma.petition.findFirst({
+    where: {
+      OR: [
+        { activatedAt: null }, // 立即激活
+        { activatedAt: { lte: new Date() } } // 已到激活时间
+      ]
+    },
     include: {
       surveys: {
         include: {

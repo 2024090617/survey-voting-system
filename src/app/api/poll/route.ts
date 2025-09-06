@@ -1,11 +1,18 @@
 export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
+import { getUserFromRequest } from '@/lib/auth'
 
 const prisma = new PrismaClient()
 
 export async function GET() {
   const petition = await prisma.petition.findFirst({
+    where: {
+      OR: [
+        { activatedAt: null }, // 立即激活
+        { activatedAt: { lte: new Date() } } // 已到激活时间
+      ]
+    },
     include: {
       surveys: {
         include: {
@@ -22,11 +29,18 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  // 验证用户身份
+  const user = getUserFromRequest(req)
+  if (!user) {
+    return NextResponse.json({ error: '未登录' }, { status: 401 })
+  }
+
   const body = await req.json()
-  const { title, content, surveys } = body as { 
+  const { title, content, surveys, activatedAt } = body as { 
     title?: string; 
     content?: string;
     surveys?: { title: string; questionType: 'single' | 'multiple'; options: { label: string; }[] }[]
+    activatedAt?: string | null
   }
   
   if (!title || !content) {
@@ -42,7 +56,12 @@ export async function POST(req: Request) {
 
   // Create new petition
   const petition = await prisma.petition.create({ 
-    data: { title, content } 
+    data: { 
+      title, 
+      content, 
+      creatorId: user.userId,
+      activatedAt: activatedAt ? new Date(activatedAt) : null
+    } 
   })
 
   // Create surveys if provided
