@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 import { NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { getUserFromRequest } from '@/lib/auth'
+import { generatePetitionPublicId } from '@/lib/utils'
 
 const prisma = new PrismaClient()
 
@@ -55,10 +56,12 @@ export async function POST(req: Request) {
   await prisma.petition.deleteMany()
 
   // Create new petition
+  const publicId = generatePetitionPublicId(title, content)
   const petition = await prisma.petition.create({ 
     data: { 
       title, 
       content, 
+      publicId,
       creatorId: user.userId,
       activatedAt: activatedAt ? new Date(activatedAt) : null
     } 
