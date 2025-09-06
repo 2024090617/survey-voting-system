@@ -258,6 +258,8 @@ export default function Page() {
         <a href="/results" className="text-blue-600 hover:text-blue-800">查看支持情况</a>
         <span className="text-gray-300">|</span>
         <a href="/admin" className="text-gray-600 hover:text-gray-800">创建请愿书</a>
+        <span className="text-gray-300">|</span>
+        <a href="/qr-generator" className="text-purple-600 hover:text-purple-800">QR码生成器</a>
       </div>
 
       {/* 签名弹窗 */}
