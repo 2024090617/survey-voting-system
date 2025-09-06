@@ -159,6 +159,15 @@ export default function Page() {
       {/* 请愿书标题 */}
       <h1 className="text-2xl font-bold mb-6">{petition?.title || '暂无请愿书'}</h1>
       
+      {!petition && (
+        <div className="text-center py-12">
+          <div className="text-gray-500 mb-4">当前暂无激活的请愿书</div>
+          <div className="text-sm text-gray-400">
+            请愿书可能还未发布，或者正在等待激活时间到来
+          </div>
+        </div>
+      )}
+      
       {/* 请愿书内容 */}
       {petition?.content && (
         <div className="prose prose-gray max-w-none mb-8 p-6 bg-gray-50 rounded-lg border">
@@ -245,8 +254,10 @@ export default function Page() {
         支持请愿书并提交签名
       </button>
       
-      <div className="mt-4 text-center">
+      <div className="mt-4 flex justify-center gap-4">
         <a href="/results" className="text-blue-600 hover:text-blue-800">查看支持情况</a>
+        <span className="text-gray-300">|</span>
+        <a href="/admin" className="text-gray-600 hover:text-gray-800">创建请愿书</a>
       </div>
 
       {/* 签名弹窗 */}

@@ -7,6 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// 用户表
+model User {
+  id        String      @id @default(cuid())
+  email     String      @unique
+  password  String      // 加密后的密码
+  name      String
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  petitions Petition[]  // 创建的请愿书
+}
+
 // 请愿书主表
 model Petition {
   id          String      @id @default(cuid())
@@ -14,6 +25,9 @@ model Petition {
   content     String      @db.Text // 富文本内容
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+  activatedAt DateTime?   // 激活时间，null表示立即激活
+  creator     User        @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  creatorId   String      // 创建者ID
   surveys     Survey[]    // 关联的调查问卷
   signatures  Signature[] // 支持签名
 }
