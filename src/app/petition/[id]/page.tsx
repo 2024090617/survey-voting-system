@@ -15,14 +15,41 @@ const phoneOk = (p: string) => /^1[3-9]\d{9}$/.test(p)
 function useSignaturePad() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [dataUrl, setDataUrl] = useState('')
+  const [isCanvasReady, setIsCanvasReady] = useState(false)
+  
+  const setupCanvas = () => {
+    const canvas = canvasRef.current
+    if (!canvas) return false
+    
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return false
+    
+    // Set canvas size to match the display size
+    const rect = canvas.getBoundingClientRect()
+    canvas.width = rect.width
+    canvas.height = rect.height
+    
+    // Set white background
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    
+    // Configure drawing style
+    ctx.strokeStyle = '#000000'
+    ctx.lineWidth = 2
+    ctx.lineCap = 'round'
+    ctx.lineJoin = 'round'
+    
+    return true
+  }
   
   const clearCanvas = () => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const ctx = canvas.getContext('2d')!
-    const rect = canvas.getBoundingClientRect()
-    ctx.fillStyle = '#fff'
-    ctx.fillRect(0, 0, rect.width, 240)
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
     setDataUrl('')
   }
 
@@ -30,80 +57,104 @@ function useSignaturePad() {
     const canvas = canvasRef.current
     if (!canvas) return
     
-    const ctx = canvas.getContext('2d')!
-    const DPR = window.devicePixelRatio || 1
-    
-    function setup() {
-      const c = canvasRef.current
-      if (!c) return
-      const rect = c.getBoundingClientRect()
-      c.width = Math.max(1, rect.width * DPR)
-      c.height = Math.max(1, 240 * DPR)
-      ctx.setTransform(DPR, 0, 0, DPR, 0, 0)
-      ctx.fillStyle = '#fff'
-      ctx.fillRect(0, 0, Math.max(1, rect.width), 240)
-      ctx.strokeStyle = '#000'
-      ctx.lineWidth = 2
-      ctx.lineCap = 'round'
-      ctx.lineJoin = 'round'
-    }
-    
-    setup()
-    
     let drawing = false
-    let last: {x:number,y:number} | null = null
+    let lastX = 0
+    let lastY = 0
     
-    const pos = (e: MouseEvent | TouchEvent) => {
+    const getCoordinates = (e: MouseEvent | TouchEvent) => {
       const rect = canvas.getBoundingClientRect()
-      const t = (e as TouchEvent).touches?.[0]
-      const x = (t ? t.clientX : (e as MouseEvent).clientX) - rect.left
-      const y = (t ? t.clientY : (e as MouseEvent).clientY) - rect.top
-      return { x, y }
+      let clientX, clientY
+      
+      if (e.type.includes('touch')) {
+        const touchEvent = e as TouchEvent
+        clientX = touchEvent.touches[0]?.clientX || touchEvent.changedTouches[0]?.clientX || 0
+        clientY = touchEvent.touches[0]?.clientY || touchEvent.changedTouches[0]?.clientY || 0
+      } else {
+        const mouseEvent = e as MouseEvent
+        clientX = mouseEvent.clientX
+        clientY = mouseEvent.clientY
+      }
+      
+      return {
+        x: clientX - rect.left,
+        y: clientY - rect.top
+      }
     }
     
-    const start = (e: MouseEvent | TouchEvent) => { 
+    const startDrawing = (e: MouseEvent | TouchEvent) => {
+      if (!isCanvasReady) return
+      
       drawing = true
-      last = pos(e)
-      e.preventDefault()
-    }
-    
-    const move = (e: MouseEvent | TouchEvent) => {
-      if (!drawing || !last) return
-      const p = pos(e)
+      const coords = getCoordinates(e)
+      lastX = coords.x
+      lastY = coords.y
+      
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+      
       ctx.beginPath()
-      ctx.moveTo(last.x, last.y)
-      ctx.lineTo(p.x, p.y)
+      ctx.moveTo(lastX, lastY)
+      
+      e.preventDefault()
+    }
+    
+    const draw = (e: MouseEvent | TouchEvent) => {
+      if (!drawing || !isCanvasReady) return
+      
+      const coords = getCoordinates(e)
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+      
+      ctx.lineTo(coords.x, coords.y)
       ctx.stroke()
-      last = p
+      
+      lastX = coords.x
+      lastY = coords.y
+      
       e.preventDefault()
     }
     
-    const end = (e: Event) => { 
+    const stopDrawing = (e: Event) => {
+      if (!drawing) return
       drawing = false
-      last = null
       e.preventDefault()
     }
     
-    // 添加事件监听器
-    canvas.addEventListener('mousedown', start)
-    canvas.addEventListener('mousemove', move)
-    window.addEventListener('mouseup', end)
-    canvas.addEventListener('touchstart', start, { passive: false })
-    canvas.addEventListener('touchmove', move, { passive: false })
-    canvas.addEventListener('touchend', end, { passive: false })
+    // Mouse events
+    canvas.addEventListener('mousedown', startDrawing)
+    canvas.addEventListener('mousemove', draw)
+    canvas.addEventListener('mouseup', stopDrawing)
+    canvas.addEventListener('mouseout', stopDrawing)
     
-    // 清理函数
+    // Touch events
+    canvas.addEventListener('touchstart', startDrawing, { passive: false })
+    canvas.addEventListener('touchmove', draw, { passive: false })
+    canvas.addEventListener('touchend', stopDrawing, { passive: false })
+    canvas.addEventListener('touchcancel', stopDrawing, { passive: false })
+    
     return () => {
-      canvas.removeEventListener('mousedown', start)
-      canvas.removeEventListener('mousemove', move)
-      window.removeEventListener('mouseup', end)
-      canvas.removeEventListener('touchstart', start)
-      canvas.removeEventListener('touchmove', move)
-      canvas.removeEventListener('touchend', end)
+      canvas.removeEventListener('mousedown', startDrawing)
+      canvas.removeEventListener('mousemove', draw)
+      canvas.removeEventListener('mouseup', stopDrawing)
+      canvas.removeEventListener('mouseout', stopDrawing)
+      canvas.removeEventListener('touchstart', startDrawing)
+      canvas.removeEventListener('touchmove', draw)
+      canvas.removeEventListener('touchend', stopDrawing)
+      canvas.removeEventListener('touchcancel', stopDrawing)
     }
-  }, []) // 空依赖数组，只在组件挂载时执行一次
+  }, [isCanvasReady])
   
-  return { canvasRef, dataUrl, setDataUrl, clearCanvas }
+  // Initialize canvas when modal opens
+  const initializeCanvas = () => {
+    // Small delay to ensure canvas is rendered
+    setTimeout(() => {
+      if (setupCanvas()) {
+        setIsCanvasReady(true)
+      }
+    }, 100)
+  }
+  
+  return { canvasRef, dataUrl, setDataUrl, clearCanvas, initializeCanvas }
 }
 
 export default function PetitionPage() {
@@ -120,7 +171,7 @@ export default function PetitionPage() {
   const [consentOpen, setConsentOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const { canvasRef, dataUrl, setDataUrl, clearCanvas } = useSignaturePad()
+  const { canvasRef, dataUrl, setDataUrl, clearCanvas, initializeCanvas } = useSignaturePad()
 
   const phoneLocked = typeof window !== 'undefined' && !!sessionStorage.getItem(`signedPhone_${petitionId}`)
 
@@ -310,7 +361,7 @@ export default function PetitionPage() {
           <button 
             className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50 hover:bg-blue-700" 
             disabled={disabledAll} 
-            onClick={()=>setOpen(true)}
+            onClick={()=>{setOpen(true); initializeCanvas();}}
           >
             点击签名
           </button>
