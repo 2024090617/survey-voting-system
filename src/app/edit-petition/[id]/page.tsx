@@ -8,6 +8,30 @@ import dynamic from 'next/dynamic'
 const ReactQuill = dynamic(() => import('react-quill'), { ssr: false })
 import 'react-quill/dist/quill.snow.css'
 
+// Quill的横线自定义Blot
+const createDividerBlot = () => {
+  if (typeof window === 'undefined') return null
+  
+  const Quill = require('quill')
+  const BlockEmbed = Quill.import('blots/block/embed')
+  
+  class DividerBlot extends BlockEmbed {
+    static create() {
+      const node = super.create()
+      node.style.borderTop = '2px solid #ccc'
+      node.style.margin = '20px 0'
+      node.style.height = '1px'
+      return node
+    }
+  }
+  
+  DividerBlot.blotName = 'divider'
+  DividerBlot.tagName = 'hr'
+  
+  Quill.register(DividerBlot, true)
+  return DividerBlot
+}
+
 interface Petition {
   id: string
   publicId: string
@@ -38,10 +62,47 @@ export default function EditPetitionPage() {
   }, [loading, isAuthenticated, router])
 
   useEffect(() => {
+    // 初始化自定义Divider blot
+    createDividerBlot()
+    
+    // 为横线按钮添加图标样式
+    if (typeof document !== 'undefined') {
+      const style = document.createElement('style')
+      style.innerHTML = `
+        .ql-hr:before {
+          content: '─';
+          font-weight: bold;
+        }
+        .ql-hr {
+          width: 30px;
+        }
+      `
+      document.head.appendChild(style)
+    }
+  }, [])
+
+  useEffect(() => {
     if (isAuthenticated && petitionId) {
       fetchPetition()
     }
   }, [isAuthenticated, petitionId])
+
+  // 插入横线的自定义处理函数
+  const insertHorizontalRule = () => {
+    // 查找当前页面的Quill编辑器实例
+    const quillElement = document.querySelector('.ql-container')
+    if (quillElement && (quillElement as any).__quill) {
+      const quill = (quillElement as any).__quill
+      const range = quill.getSelection()
+      if (range) {
+        // 插入换行符，然后插入横线，再插入换行符
+        quill.insertText(range.index, '\n', 'user')
+        quill.insertEmbed(range.index + 1, 'divider', true, 'user')
+        quill.insertText(range.index + 2, '\n', 'user')
+        quill.setSelection(range.index + 3, 0)
+      }
+    }
+  }
 
   const fetchPetition = async () => {
     try {
@@ -195,16 +256,22 @@ export default function EditPetitionPage() {
                 onChange={setContent}
                 className="bg-white"
                 modules={{
-                  toolbar: [
-                    [{ 'header': [1, 2, 3, false] }],
-                    ['bold', 'italic', 'underline', 'strike'],
-                    ['blockquote', 'code-block'],
-                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                    [{ 'color': [] }, { 'background': [] }],
-                    [{ 'align': [] }],
-                    ['link'],
-                    ['clean']
-                  ]
+                  toolbar: {
+                    container: [
+                      [{ 'header': [1, 2, 3, false] }],
+                      ['bold', 'italic', 'underline', 'strike'],
+                      ['blockquote', 'code-block'],
+                      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                      [{ 'color': [] }, { 'background': [] }],
+                      [{ 'align': [] }],
+                      ['link'],
+                      ['hr'],
+                      ['clean']
+                    ],
+                    handlers: {
+                      'hr': insertHorizontalRule
+                    }
+                  }
                 }}
                 style={{ height: '400px', marginBottom: '50px' }}
               />
