@@ -295,7 +295,7 @@ export default function PetitionPage() {
       {/* 请愿书内容 */}
       {petition?.content && (
         <div className="prose prose-gray max-w-none mb-8 p-6 bg-gray-50 rounded-lg border">
-          <div dangerouslySetInnerHTML={{ __html: petition.content }} />
+          <div className="ql-editor" dangerouslySetInnerHTML={{ __html: petition.content }} />
         </div>
       )}
 

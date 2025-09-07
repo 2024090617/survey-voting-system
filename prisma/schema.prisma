@@ -21,7 +21,6 @@ model User {
 // 请愿书主表
 model Petition {
   id          String      @id @default(cuid())
-  publicId    String      @unique // 公开的唯一ID，用于外部访问
   title       String
   content     String      @db.Text // 富文本内容
   createdAt   DateTime    @default(now())
