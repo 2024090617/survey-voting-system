@@ -24,7 +24,7 @@ export async function GET() {
       .png()
       .composite(composite)
       .toBuffer()
-    return new NextResponse(out, { headers: { 'Content-Type': 'image/png' } })
+    return new NextResponse(out as BodyInit, { headers: { 'Content-Type': 'image/png' } })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }

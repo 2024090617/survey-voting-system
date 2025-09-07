@@ -8,6 +8,23 @@ import { useAuth } from '@/hooks/useAuth'
 const ReactQuill = dynamic(() => import('react-quill'), { ssr: false })
 import 'react-quill/dist/quill.snow.css'
 
+// 简化的横线处理函数
+const insertHorizontalRule = () => {
+  // 查找当前页面的Quill编辑器实例
+  const quillElement = document.querySelector('.ql-container')
+  if (quillElement && (quillElement as any).__quill) {
+    const quill = (quillElement as any).__quill
+    const range = quill.getSelection()
+    if (range) {
+      // 插入换行符和横线文本
+      quill.insertText(range.index, '\n', 'user')
+      quill.insertText(range.index + 1, '────────────────────────────────', 'user')
+      quill.insertText(range.index + 33, '\n', 'user')
+      quill.setSelection(range.index + 34, 0)
+    }
+  }
+}
+
 type SurveyOption = { label: string }
 type Survey = { 
   title: string; 
@@ -31,6 +48,24 @@ export default function AdminPage() {
       router.push('/auth')
     }
   }, [loading, isAuthenticated, router])
+
+  useEffect(() => {
+    // 为横线按钮添加图标样式
+    if (typeof document !== 'undefined') {
+      const style = document.createElement('style')
+      style.innerHTML = `
+        .ql-hr:before {
+          content: '─';
+          font-weight: bold;
+        }
+        .ql-hr {
+          width: 30px;
+        }
+      `
+      document.head.appendChild(style)
+    }
+  }, [])
+
 
   // 添加调查问卷
   const addSurvey = () => {
@@ -170,16 +205,22 @@ export default function AdminPage() {
             value={content}
             onChange={setContent}
             modules={{
-              toolbar: [
-                [{ 'header': [1, 2, 3, false] }],
-                ['bold', 'italic', 'underline', 'strike'],
-                [{ 'color': [] }, { 'background': [] }],
-                [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                [{ 'indent': '-1'}, { 'indent': '+1' }],
-                [{ 'align': [] }],
-                ['link'],
-                ['clean']
-              ]
+              toolbar: {
+                container: [
+                  [{ 'header': [1, 2, 3, false] }],
+                  ['bold', 'italic', 'underline', 'strike'],
+                  [{ 'color': [] }, { 'background': [] }],
+                  [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                  [{ 'indent': '-1'}, { 'indent': '+1' }],
+                  [{ 'align': [] }],
+                  ['link'],
+                  ['hr'],
+                  ['clean']
+                ],
+                handlers: {
+                  'hr': insertHorizontalRule
+                }
+              }
             }}
             style={{ height: '200px', marginBottom: '42px' }}
           />
