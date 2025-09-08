@@ -5,7 +5,10 @@
     "scripts": {
         "dev": "next dev",
         "build": "next build",
-        "start": "next start"
+        "start": "next start",
+        "setup": "chmod +x scripts/install-deps.sh && ./scripts/install-deps.sh && npm install",
+        "test-canvas": "node -e \"const { createCanvas } = require('canvas'); console.log('✅ Canvas package is working correctly!');\"",
+        "test-qr": "node scripts/test-qr.js"
     },
     "dependencies": {
         "@prisma/client": "^6.15.0",

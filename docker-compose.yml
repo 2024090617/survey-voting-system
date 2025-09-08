@@ -10,5 +10,21 @@ services:
       - '5432:5432'
     volumes:
       - db_data:/var/lib/postgresql/data
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - DATABASE_URL=postgresql://survey:survey@db:5432/survey
+    depends_on:
+      - db
+
 volumes:
   db_data:
