@@ -28,8 +28,8 @@ export async function GET() {
   
   const totalSignatures = await prisma.signature.count({ where: { petitionId: petition.id } })
   
-  const surveyResults = await Promise.all(petition.surveys.map(async survey => {
-    const optionCounts = await Promise.all(survey.options.map(async option => ({
+  const surveyResults = await Promise.all(petition.surveys.map(async (survey: any) => {
+    const optionCounts = await Promise.all(survey.options.map(async (option: any) => ({
       optionId: option.id,
       label: option.label,
       count: await prisma.surveyResponse.count({ 
