@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     // Convert canvas to buffer
     const buffer = canvas.toBuffer('image/png')
 
-    return new Response(buffer, {
+    return new Response(buffer as BodyInit, {
       headers: {
         'Content-Type': 'image/png',
         'Cache-Control': 'no-cache',
