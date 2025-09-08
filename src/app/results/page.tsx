@@ -45,7 +45,7 @@ export default function ResultsPage() {
         <div className="bg-gray-50 p-6 rounded-lg border">
           <h2 className="text-lg font-semibold mb-4">请愿书内容</h2>
           <div 
-            className="prose prose-gray max-w-none"
+            className="prose prose-gray max-w-none ql-editor"
             dangerouslySetInnerHTML={{ __html: petition.content }} 
           />
         </div>

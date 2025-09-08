@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
+import { useParams } from 'next/navigation'
 
 type Survey = { 
   id: string; 
@@ -7,69 +8,159 @@ type Survey = {
   questionType: 'single' | 'multiple';
   options: { id: string; label: string; order: number }[];
 }
-type Petition = { id: string; title: string; content: string }
+type Petition = { id: string; title: string; content: string; publicId: string }
 
 const phoneOk = (p: string) => /^1[3-9]\d{9}$/.test(p)
 
 function useSignaturePad() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [dataUrl, setDataUrl] = useState('')
-  useEffect(() => {
+  const [isCanvasReady, setIsCanvasReady] = useState(false)
+  
+  const setupCanvas = () => {
     const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')!
-    const DPR = window.devicePixelRatio || 1
-    function setup() {
-      const c = canvasRef.current
-      if (!c) return
-      const rect = c.getBoundingClientRect()
-      c.width = Math.max(1, rect.width * DPR)
-      c.height = Math.max(1, 240 * DPR)
-      ctx.setTransform(DPR, 0, 0, DPR, 0, 0)
-    ctx.fillStyle = '#fff'
-      ctx.fillRect(0,0,Math.max(1, rect.width),240)
-    ctx.strokeStyle = '#000'
+    if (!canvas) return false
+    
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return false
+    
+    // Set canvas size to match the display size
+    const rect = canvas.getBoundingClientRect()
+    canvas.width = rect.width
+    canvas.height = rect.height
+    
+    // Set white background
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    
+    // Configure drawing style
+    ctx.strokeStyle = '#000000'
     ctx.lineWidth = 2
     ctx.lineCap = 'round'
     ctx.lineJoin = 'round'
+    
+    return true
   }
-    setup()
+  
+  const clearCanvas = () => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, canvas.width, canvas.height)
+    setDataUrl('')
+  }
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    
     let drawing = false
-    let last: {x:number,y:number} | null = null
-    const pos = (e: MouseEvent | TouchEvent) => {
-    const rect = canvas.getBoundingClientRect()
-      const t = (e as TouchEvent).touches?.[0]
-      const x = (t? t.clientX : (e as MouseEvent).clientX) - rect.left
-      const y = (t? t.clientY : (e as MouseEvent).clientY) - rect.top
-      return { x, y }
+    let lastX = 0
+    let lastY = 0
+    
+    const getCoordinates = (e: MouseEvent | TouchEvent) => {
+      const rect = canvas.getBoundingClientRect()
+      let clientX, clientY
+      
+      if (e.type.includes('touch')) {
+        const touchEvent = e as TouchEvent
+        clientX = touchEvent.touches[0]?.clientX || touchEvent.changedTouches[0]?.clientX || 0
+        clientY = touchEvent.touches[0]?.clientY || touchEvent.changedTouches[0]?.clientY || 0
+      } else {
+        const mouseEvent = e as MouseEvent
+        clientX = mouseEvent.clientX
+        clientY = mouseEvent.clientY
+      }
+      
+      return {
+        x: clientX - rect.left,
+        y: clientY - rect.top
+      }
     }
-    const start = (e: any) => { drawing = true; last = pos(e) }
-    const move = (e: any) => {
-      if (!drawing || !last) return
-      const p = pos(e)
-      ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke(); last = p
-    e.preventDefault()
+    
+    const startDrawing = (e: MouseEvent | TouchEvent) => {
+      if (!isCanvasReady) return
+      
+      drawing = true
+      const coords = getCoordinates(e)
+      lastX = coords.x
+      lastY = coords.y
+      
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+      
+      ctx.beginPath()
+      ctx.moveTo(lastX, lastY)
+      
+      e.preventDefault()
     }
-    const end = () => { drawing = false; last = null }
-    canvas.addEventListener('mousedown', start)
-    canvas.addEventListener('mousemove', move)
-    window.addEventListener('mouseup', end)
-    canvas.addEventListener('touchstart', start, { passive: false })
-    canvas.addEventListener('touchmove', move, { passive: false })
-    canvas.addEventListener('touchend', end)
+    
+    const draw = (e: MouseEvent | TouchEvent) => {
+      if (!drawing || !isCanvasReady) return
+      
+      const coords = getCoordinates(e)
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+      
+      ctx.lineTo(coords.x, coords.y)
+      ctx.stroke()
+      
+      lastX = coords.x
+      lastY = coords.y
+      
+      e.preventDefault()
+    }
+    
+    const stopDrawing = (e: Event) => {
+      if (!drawing) return
+      drawing = false
+      e.preventDefault()
+    }
+    
+    // Mouse events
+    canvas.addEventListener('mousedown', startDrawing)
+    canvas.addEventListener('mousemove', draw)
+    canvas.addEventListener('mouseup', stopDrawing)
+    canvas.addEventListener('mouseout', stopDrawing)
+    
+    // Touch events
+    canvas.addEventListener('touchstart', startDrawing, { passive: false })
+    canvas.addEventListener('touchmove', draw, { passive: false })
+    canvas.addEventListener('touchend', stopDrawing, { passive: false })
+    canvas.addEventListener('touchcancel', stopDrawing, { passive: false })
+    
     return () => {
-      canvas.removeEventListener('mousedown', start)
-      canvas.removeEventListener('mousemove', move)
-      window.removeEventListener('mouseup', end)
-      canvas.removeEventListener('touchstart', start)
-      canvas.removeEventListener('touchmove', move)
-      canvas.removeEventListener('touchend', end)
+      canvas.removeEventListener('mousedown', startDrawing)
+      canvas.removeEventListener('mousemove', draw)
+      canvas.removeEventListener('mouseup', stopDrawing)
+      canvas.removeEventListener('mouseout', stopDrawing)
+      canvas.removeEventListener('touchstart', startDrawing)
+      canvas.removeEventListener('touchmove', draw)
+      canvas.removeEventListener('touchend', stopDrawing)
+      canvas.removeEventListener('touchcancel', stopDrawing)
     }
-  }, [])
-  return { canvasRef, dataUrl, setDataUrl }
+  }, [isCanvasReady])
+  
+  // Initialize canvas when modal opens
+  const initializeCanvas = () => {
+    // Small delay to ensure canvas is rendered
+    setTimeout(() => {
+      if (setupCanvas()) {
+        setIsCanvasReady(true)
+      }
+    }, 100)
+  }
+  
+  return { canvasRef, dataUrl, setDataUrl, clearCanvas, initializeCanvas }
 }
 
-export default function Page() {
+export default function PetitionPage() {
+  const params = useParams()
+  const petitionId = params.id as string
+  
   const [petition, setPetition] = useState<Petition | null>(null)
   const [surveys, setSurveys] = useState<Survey[]>([])
   const [surveyResponses, setSurveyResponses] = useState<Record<string, string[]>>({})
@@ -78,19 +169,42 @@ export default function Page() {
   const [open, setOpen] = useState(false)
   const [consented, setConsented] = useState(false)
   const [consentOpen, setConsentOpen] = useState(false)
-  const { canvasRef, dataUrl, setDataUrl } = useSignaturePad()
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const { canvasRef, dataUrl, setDataUrl, clearCanvas, initializeCanvas } = useSignaturePad()
 
-  const phoneLocked = typeof window !== 'undefined' && !!sessionStorage.getItem('signedPhone')
+  const phoneLocked = typeof window !== 'undefined' && !!sessionStorage.getItem(`signedPhone_${petitionId}`)
 
   useEffect(() => {
-    fetch('/api/poll').then(r=>r.json()).then(d=>{ setPetition(d.petition); setSurveys(d.surveys) })
-  }, [])
+    if (petitionId) {
+      fetchPetition()
+    }
+  }, [petitionId])
 
   useEffect(() => {
     const c = typeof window !== 'undefined' && localStorage.getItem('consentAccepted') === '1'
     setConsented(!!c)
-    if (!c) setConsentOpen(true)
-  }, [])
+    if (!c && petition) setConsentOpen(true)
+  }, [petition])
+
+  const fetchPetition = async () => {
+    try {
+      const res = await fetch(`/api/petition/${petitionId}`)
+      const data = await res.json()
+      
+      if (!res.ok) {
+        setError(data.error || '获取请愿书失败')
+        return
+      }
+      
+      setPetition(data.petition)
+      setSurveys(data.surveys)
+    } catch (error) {
+      setError('网络错误，请稍后重试')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleSurveyResponse = (surveyId: string, optionId: string, checked: boolean) => {
     const survey = surveys.find(s => s.id === surveyId)
@@ -147,9 +261,28 @@ export default function Page() {
     })
     const json = await res.json()
     if (!res.ok) return alert(json.error || '提交失败')
-    sessionStorage.setItem('signedPhone', phone)
+    sessionStorage.setItem(`signedPhone_${petitionId}`, phone)
     alert('签名成功')
     location.href = '/results'
+  }
+
+  if (loading) {
+    return (
+      <main className="max-w-2xl mx-auto p-4 min-h-screen flex items-center justify-center">
+        <div className="text-gray-500">加载中...</div>
+      </main>
+    )
+  }
+
+  if (error) {
+    return (
+      <main className="max-w-2xl mx-auto p-4 min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-red-600 mb-4">{error}</div>
+          <a href="/" className="text-blue-600 hover:text-blue-800">返回首页</a>
+        </div>
+      </main>
+    )
   }
 
   const disabledAll = phoneLocked || !consented
@@ -157,16 +290,7 @@ export default function Page() {
   return (
     <main className="max-w-2xl mx-auto p-4">
       {/* 请愿书标题 */}
-      <h1 className="text-2xl font-bold mb-6">{petition?.title || '暂无请愿书'}</h1>
-      
-      {!petition && (
-        <div className="text-center py-12">
-          <div className="text-gray-500 mb-4">当前暂无激活的请愿书</div>
-          <div className="text-sm text-gray-400">
-            请愿书可能还未发布，或者正在等待激活时间到来
-          </div>
-        </div>
-      )}
+      <h1 className="text-2xl font-bold mb-6">{petition?.title || '请愿书'}</h1>
       
       {/* 请愿书内容 */}
       {petition?.content && (
@@ -237,7 +361,7 @@ export default function Page() {
           <button 
             className="px-4 py-2 bg-blue-600 text-white rounded disabled:opacity-50 hover:bg-blue-700" 
             disabled={disabledAll} 
-            onClick={()=>setOpen(true)}
+            onClick={()=>{setOpen(true); initializeCanvas();}}
           >
             点击签名
           </button>
@@ -257,9 +381,7 @@ export default function Page() {
       <div className="mt-4 flex justify-center gap-4">
         <a href="/results" className="text-blue-600 hover:text-blue-800">查看支持情况</a>
         <span className="text-gray-300">|</span>
-        <a href="/admin" className="text-gray-600 hover:text-gray-800">创建请愿书</a>
-        <span className="text-gray-300">|</span>
-        <a href="/qr-generator" className="text-purple-600 hover:text-purple-800">QR码生成器</a>
+        <a href="/" className="text-gray-600 hover:text-gray-800">返回首页</a>
       </div>
 
       {/* 签名弹窗 */}
@@ -278,7 +400,7 @@ export default function Page() {
             <div className="flex gap-2 justify-end p-3 border-t">
               <button 
                 className="px-3 py-2 border rounded hover:bg-gray-50" 
-                onClick={()=>setDataUrl('')}
+                onClick={clearCanvas}
               >
                 清除
               </button>

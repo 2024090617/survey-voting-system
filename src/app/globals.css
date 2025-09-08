@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "react-quill/dist/quill.snow.css";
 
 body {
   font-family: system-ui, -apple-system, Segoe UI, Roboto, PingFang SC, Helvetica, Arial;
