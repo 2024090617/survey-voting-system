@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import QRCode from 'qrcode'
-import { createCanvas, loadImage } from 'canvas'
+import sharp from 'sharp'
+
+// Ensure Node.js runtime for sharp
+export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   try {
@@ -37,9 +40,9 @@ export async function POST(request: NextRequest) {
     // If no logo, return the basic QR code
     if (!logoFile) {
       const base64Data = qrCodeDataUrl.split(',')[1]
-      const buffer = Buffer.from(base64Data, 'base64')
-      
-      return new Response(buffer, {
+  const buffer = Buffer.from(base64Data, 'base64')
+  const body = new Uint8Array(buffer)
+  return new Response(body, {
         headers: {
           'Content-Type': 'image/png',
           'Cache-Control': 'no-cache',
@@ -47,50 +50,53 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Create canvas for combining QR code with logo
-    const canvas = createCanvas(size, size)
-    const ctx = canvas.getContext('2d')
+    // Compose using sharp (no native cairo/pixman needed)
+    const baseQRBuffer = Buffer.from(qrCodeDataUrl.split(',')[1], 'base64')
 
-    // Load and draw base QR code
-    const qrImage = await loadImage(qrCodeDataUrl)
-    ctx.drawImage(qrImage, 0, 0, size, size)
+    // Prepare base image from QR buffer
+    let image = sharp(baseQRBuffer).resize(size, size)
 
-    // Load and process logo
-    const logoBuffer = await logoFile.arrayBuffer()
-    const logoImage = await loadImage(Buffer.from(logoBuffer))
+    // Prepare logo as a circle with optional white background circle
+    const rawLogo = Buffer.from(await logoFile.arrayBuffer())
+    const resizedLogo = await sharp(rawLogo)
+      .resize(logoSize, logoSize, { fit: 'cover' })
+      .toBuffer()
 
-    // Calculate logo position (center)
-    const logoX = (size - logoSize) / 2
-    const logoY = (size - logoSize) / 2
-
-    // Create white background circle for logo (optional)
-    const logoBackgroundSize = logoSize + 10
-    const logoBackgroundX = (size - logoBackgroundSize) / 2
-    const logoBackgroundY = (size - logoBackgroundSize) / 2
-
-    ctx.fillStyle = backgroundColor
-    ctx.beginPath()
-    ctx.arc(
-      logoBackgroundX + logoBackgroundSize / 2,
-      logoBackgroundY + logoBackgroundSize / 2,
-      logoBackgroundSize / 2,
-      0,
-      2 * Math.PI
+    // Create circular mask SVG for the logo
+    const r = Math.floor(logoSize / 2)
+    const circleMaskSvg = Buffer.from(
+      `<svg width="${logoSize}" height="${logoSize}">
+         <circle cx="${r}" cy="${r}" r="${r}" fill="white" />
+       </svg>`
     )
-    ctx.fill()
+    const circularLogo = await sharp(resizedLogo)
+      .composite([{ input: circleMaskSvg, blend: 'dest-in' }])
+      .toBuffer()
 
-    // Draw logo
-    ctx.save()
-    ctx.beginPath()
-    ctx.arc(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2, 0, 2 * Math.PI)
-    ctx.clip()
-    ctx.drawImage(logoImage, logoX, logoY, logoSize, logoSize)
-    ctx.restore()
+    // Optional white background circle behind the logo for contrast
+    const logoBackgroundSize = logoSize + 10
+    const bgR = Math.floor(logoBackgroundSize / 2)
+    const bgCircleSvg = Buffer.from(
+      `<svg width="${logoBackgroundSize}" height="${logoBackgroundSize}">
+         <circle cx="${bgR}" cy="${bgR}" r="${bgR}" fill="${backgroundColor}" />
+       </svg>`
+    )
 
-    // Convert canvas to buffer
-    const buffer = canvas.toBuffer('image/png')
+    const composites: sharp.OverlayOptions[] = []
 
-    return new Response(buffer, {
+    // Center positions
+    const bgLeft = Math.round((size - logoBackgroundSize) / 2)
+    const bgTop = Math.round((size - logoBackgroundSize) / 2)
+    const logoLeft = Math.round((size - logoSize) / 2)
+    const logoTop = Math.round((size - logoSize) / 2)
+
+    // Add background circle then the circular logo
+    composites.push({ input: bgCircleSvg, left: bgLeft, top: bgTop })
+    composites.push({ input: circularLogo, left: logoLeft, top: logoTop })
+
+  const buffer = await image.composite(composites).png().toBuffer()
+  const body = new Uint8Array(buffer)
+  return new Response(body, {
       headers: {
         'Content-Type': 'image/png',
         'Cache-Control': 'no-cache',

@@ -4,8 +4,8 @@ import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
 import { useAuth } from '@/hooks/useAuth'
 
-// 动态导入富文本编辑器，避免SSR问题
-const ReactQuill = dynamic(() => import('react-quill'), { ssr: false })
+// 动态导入富文本编辑器，避免SSR问题（显式使用 default 导出）
+const ReactQuill = dynamic(() => import('react-quill').then(m => m.default), { ssr: false })
 import 'react-quill/dist/quill.snow.css'
 
 // 简化的横线处理函数
@@ -148,7 +148,7 @@ export default function AdminPage() {
       }) 
     })
     setBusy(false)
-    const json = await res.json()
+  const json = await res.json()
     if (!res.ok) {
       if (res.status === 401) {
         alert('请重新登录')
@@ -158,7 +158,8 @@ export default function AdminPage() {
       }
       return alert(json.error || '创建失败')
     }
-    alert('创建成功')
+  alert(`创建成功，ID: ${json.publicId}`)
+  router.push('/dashboard')
   }
 
   // 如果正在加载或未登录，显示加载状态

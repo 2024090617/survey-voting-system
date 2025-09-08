@@ -4,8 +4,8 @@ import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 
-// 动态导入 ReactQuill 以避免 SSR 问题
-const ReactQuill = dynamic(() => import('react-quill'), { ssr: false })
+// 动态导入 ReactQuill 以避免 SSR 问题（显式 default）
+const ReactQuill = dynamic(() => import('react-quill').then(m => m.default), { ssr: false })
 import 'react-quill/dist/quill.snow.css'
 
 // 简化的横线处理函数
@@ -220,7 +220,17 @@ export default function EditPetitionPage() {
                 placeholder="请输入请愿书标题"
               />
             </div>
+            <div className="font-fangsong text-lg">
+  这段文字将显示为仿宋字体（或最接近的替代字体）
+</div>
 
+<h1 className="font-kaiti text-2xl font-bold">
+  楷书标题
+</h1>
+
+<p className="font-noto-serif">
+  Noto衬线字体段落
+</p>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 请愿书内容 *

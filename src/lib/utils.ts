@@ -15,5 +15,11 @@ export function generatePetitionPublicId(title: string, content: string): string
  * 验证公共ID格式
  */
 export function isValidPetitionId(id: string): boolean {
-  return /^[a-f0-9]{12}$/.test(id)
+  if (!id || typeof id !== 'string') return false
+  // Support legacy 12-hex IDs
+  const hex12 = /^[a-f0-9]{12}$/
+  // Support Prisma cuid() publicId: starts with 'c' and is lower-case alphanumeric
+  // Typical length ~25-26, but allow a safe range to avoid false negatives
+  const cuidLike = /^c[a-z0-9]{10,35}$/
+  return hex12.test(id) || cuidLike.test(id)
 }

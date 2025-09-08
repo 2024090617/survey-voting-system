@@ -47,14 +47,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'title and content required' }, { status: 400 })
   }
 
-  // Reset existing data
-  await prisma.surveyResponse.deleteMany()
-  await prisma.signature.deleteMany()
-  await prisma.surveyOption.deleteMany()
-  await prisma.survey.deleteMany()
-  await prisma.petition.deleteMany()
-
-  // Create new petition
+  // Create a new petition for current user (no global reset)
   const petition = await prisma.petition.create({ 
     data: { 
       title, 
@@ -90,5 +83,5 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, id: petition.id })
+  return NextResponse.json({ ok: true, id: petition.id, publicId: petition.publicId })
 }

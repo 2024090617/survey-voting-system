@@ -17,7 +17,7 @@ export async function GET(
   }
   
   try {
-    const petition = await prisma.petition.findUnique({
+    const petition = await prisma.petition.findFirst({
       where: { 
         publicId: id,
         OR: [

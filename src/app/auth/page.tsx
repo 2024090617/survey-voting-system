@@ -56,9 +56,11 @@ export default function AuthPage() {
 
       // 保存token到localStorage
       localStorage.setItem('authToken', data.token)
+      // 写入到cookie（可选）
+      document.cookie = `authToken=${data.token}; path=/; max-age=${7 * 24 * 60 * 60}` // 7天
       
       // 跳转到管理页面
-      router.push('/admin')
+      router.push('/dashboard')
 
     } catch (error) {
       setError('网络错误，请稍后重试')
